@@ -3,7 +3,7 @@
  * Plugin Name: Evy - Add-Ons Theme Storefront
  * Plugin URI:  https://github.com/EvyOfficer
  * Description: Add-Ons for the Storefront theme, product visibility and related products.
- * Version:     1.2.0
+ * Version:     1.3.0
  * Author:      EvyOfficer
  * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
@@ -16,7 +16,7 @@
 defined('ABSPATH') || exit;
 
 // กำหนดค่าคงที่ (Constants) สำหรับปลั๊กอินของคุณ
-define( 'EVY_ADDONS_VERSION', '1.2.0' );
+define( 'EVY_ADDONS_VERSION', '1.3.0' );
 define( 'EVY_ADDONS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EVY_ADDONS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -74,6 +74,15 @@ function evy_get_hide_menu_user_logins() {
     return $users;
 }
 
+/**
+ * รายการเมนูที่ต้องซ่อนตามชื่อผู้ใช้
+ * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'menu_slug1', 'menu_slug2' ] ]
+ */
+function evy_get_hidden_menus_by_user() {
+    $data = get_option('evy_hidden_menus_by_user', []);
+    return is_array($data) ? $data : [];
+}
+
 // =============================================================================
 // ⚙️ ส่วนเสริม: หน้าการตั้งค่าในแผงควบคุม
 // =============================================================================
@@ -124,6 +133,12 @@ function evy_register_settings() {
     register_setting('evy_addons_settings', 'evy_hide_menu_user_logins', [
         'type' => 'array',
         'sanitize_callback' => 'evy_sanitize_csv',
+        'default' => [],
+    ]);
+
+    register_setting('evy_addons_settings', 'evy_hidden_menus_by_user', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_hidden_menus_by_user',
         'default' => [],
     ]);
 
@@ -183,6 +198,14 @@ function evy_register_settings() {
         'evy_addons_settings',
         'evy_settings_section'
     );
+
+    add_settings_field(
+        'evy_hidden_menus_by_user',
+        __('Hidden Menus by User', 'evy-add-ons-storefront'),
+        'evy_field_hidden_menus_by_user',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
 }
 
 function evy_sanitize_csv($value) {
@@ -191,6 +214,28 @@ function evy_sanitize_csv($value) {
     }
     $value = array_filter(array_map('sanitize_key', array_map('trim', $value)));
     return $value;
+}
+
+function evy_sanitize_hidden_menus_by_user($value) {
+    if (is_array($value)) {
+        $lines = $value;
+    } else {
+        $lines = explode("\n", $value);
+    }
+    $result = [];
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (!$line || strpos($line, ':') === false) {
+            continue;
+        }
+        list($login, $menus) = array_map('trim', explode(':', $line, 2));
+        $login = sanitize_user($login);
+        $slugs = array_filter(array_map('sanitize_key', array_map('trim', explode(',', $menus))));
+        if ($login && !empty($slugs)) {
+            $result[$login] = $slugs;
+        }
+    }
+    return $result;
 }
 
 function evy_field_full_access_roles() {
@@ -239,6 +284,27 @@ function evy_field_hide_menu_users() {
     }
     echo '<input type="text" name="evy_hide_menu_user_logins" value="' . esc_attr($value) . '" class="regular-text" />';
     echo '<p class="description">' . esc_html__('Comma separated user logins', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_hidden_menus_by_user() {
+    $value = get_option('evy_hidden_menus_by_user', []);
+    $lines = [];
+    foreach ($value as $login => $menus) {
+        $lines[] = $login . ':' . implode(',', $menus);
+    }
+    $value = implode("\n", $lines);
+    echo '<textarea name="evy_hidden_menus_by_user" rows="5" cols="40">' . esc_textarea($value) . '</textarea>';
+    global $menu;
+    $slugs = [];
+    foreach ((array) $menu as $m) {
+        if (!empty($m[2])) {
+            $slugs[] = esc_html($m[2]);
+        }
+    }
+    if ($slugs) {
+        echo '<p class="description">' . esc_html__('Format: user_login:menu_slug1,menu_slug2', 'evy-add-ons-storefront') . '</p>';
+        echo '<pre>' . implode("\n", $slugs) . '</pre>';
+    }
 }
 
 function evy_render_settings_page() {
@@ -436,14 +502,28 @@ function evy_prevent_nickname_update($user_id) {
 function evy_hide_for_shop_manager() {
     $user = wp_get_current_user();
     $logins = evy_get_hide_menu_user_logins();
+    $custom = evy_get_hidden_menus_by_user();
+    $user_menus = $custom[$user->user_login] ?? [];
 
-    if (!current_user_can('shop_manager') && !in_array($user->user_login, $logins, true)) {
+    if (!current_user_can('shop_manager') && !in_array($user->user_login, $logins, true) && empty($user_menus)) {
         return;
     }
 
-    remove_menu_page('index.php');
-    remove_menu_page('themes.php');
-    remove_submenu_page('tools.php', 'import.php');
+    if (current_user_can('shop_manager') || in_array($user->user_login, $logins, true)) {
+        remove_menu_page('index.php');
+        remove_menu_page('themes.php');
+        remove_submenu_page('tools.php', 'import.php');
+    }
+
+    foreach ($user_menus as $slug) {
+        remove_menu_page($slug);
+        global $menu;
+        foreach ((array) $menu as $m) {
+            if (!empty($m[2])) {
+                remove_submenu_page($m[2], $slug);
+            }
+        }
+    }
 }
 
 // --- End: Admin UX Tweaks ---
