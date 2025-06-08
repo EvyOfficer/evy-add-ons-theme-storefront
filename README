@@ -35,8 +35,9 @@ OM SAB Add-Ons Related Products on Theme Storefront
 ในหน้า Plugins (ปลั๊กอิน) ให้ค้นหา Evy Add-Ons Theme Storefront
 คลิก Activate (เปิดใช้งาน)
 การปรับแต่ง User Roles และ Product Categories
-ตอนนี้คุณสามารถตั้งค่าบทบาทผู้ใช้และหมวดหมู่สินค้าที่ต้องการได้จากหน้า
+ตอนนี้คุณสามารถกำหนดบทบาทผู้ใช้ที่เข้าถึงสินค้าได้ รวมถึงระบุหมวดหมู่สินค้าสำหรับแต่ละผู้ใช้ได้จากหน้า
 **Settings → Evy Add-Ons** ภายในแผงควบคุม WordPress โดยไม่ต้องแก้ไขโค้ดอีกต่อไป:
+สำหรับการจำกัดหมวดหมู่ตามผู้ใช้ ให้กรอกหนึ่งบรรทัดต่อกฎในช่อง **Restricted Categories by User** ในรูปแบบ `user_login:slug1,slug2`.
 
 
 การสนับสนุน
@@ -52,6 +53,7 @@ Product Visibility by User Role:
 
 Hides products within specified categories (e.g., "Short term accommodation") from general users.
 Allows users with specific roles (e.g., tenant) to see only products within the otherwise restricted categories.
+You can now restrict categories for individual user logins using the **Restricted Categories by User** setting.
 Administrators and Shop Managers (shop_manager) maintain full visibility of all products, without any restrictions.
 This functionality applies to both the website frontend and the REST API (for WooCommerce mobile applications).
 Related Products Enhancement:
@@ -79,7 +81,8 @@ Activate New Plugin:
 On the Plugins page, locate Evy Add-Ons Theme Storefront.
 Click Activate.
 Customizing User Roles and Product Categories
-You can now manage which roles have access to products and which categories are restricted from the **Settings → Evy Add-Ons** page inside your WordPress dashboard.
+You can manage which roles have access to products and assign category access per user from the **Settings → Evy Add-Ons** page inside your WordPress dashboard.
+For per-user restrictions, enter one rule per line in the **Restricted Categories by User** field using the format `user_login:slug1,slug2`.
 
 Support
 If you encounter any issues or have questions regarding the plugin's usage, please contact the developer.
