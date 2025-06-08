@@ -3,7 +3,7 @@
  * Plugin Name: Evy - Add-Ons Theme Storefront
  * Plugin URI:  https://github.com/EvyOfficer
  * Description: Add-Ons for the Storefront theme, product visibility and related products.
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      EvyOfficer
  * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
@@ -16,7 +16,7 @@
 defined('ABSPATH') || exit;
 
 // กำหนดค่าคงที่ (Constants) สำหรับปลั๊กอินของคุณ
-define( 'EVY_ADDONS_VERSION', '1.3.0' );
+define( 'EVY_ADDONS_VERSION', '1.4.0' );
 define( 'EVY_ADDONS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EVY_ADDONS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -83,6 +83,15 @@ function evy_get_hidden_menus_by_user() {
     return is_array($data) ? $data : [];
 }
 
+/**
+ * หมวดหมู่สินค้าที่ถูกจำกัดตามชื่อผู้ใช้
+ * รูปแบบค่าที่คืน: [ 'user_login' => [ 'slug1', 'slug2' ] ]
+ */
+function evy_get_restricted_categories_by_user() {
+    $data = get_option('evy_restricted_categories_by_user', []);
+    return is_array($data) ? $data : [];
+}
+
 // =============================================================================
 // ⚙️ ส่วนเสริม: หน้าการตั้งค่าในแผงควบคุม
 // =============================================================================
@@ -142,6 +151,12 @@ function evy_register_settings() {
         'default' => [],
     ]);
 
+    register_setting('evy_addons_settings', 'evy_restricted_categories_by_user', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_restricted_categories_by_user',
+        'default' => [],
+    ]);
+
     add_settings_section(
         'evy_settings_section',
         __('User Roles & Categories', 'evy-add-ons-storefront'),
@@ -158,17 +173,9 @@ function evy_register_settings() {
     );
 
     add_settings_field(
-        'evy_restricted_categories_slugs',
-        __('Restricted Category Slugs', 'evy-add-ons-storefront'),
-        'evy_field_restricted_categories',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
-
-    add_settings_field(
-        'evy_restricted_category_access_roles',
-        __('Roles for Restricted Categories', 'evy-add-ons-storefront'),
-        'evy_field_restricted_roles',
+        'evy_restricted_categories_by_user',
+        __('Restricted Categories by User', 'evy-add-ons-storefront'),
+        'evy_field_restricted_categories_by_user',
         'evy_addons_settings',
         'evy_settings_section'
     );
@@ -231,6 +238,28 @@ function evy_sanitize_hidden_menus_by_user($value) {
         list($login, $menus) = array_map('trim', explode(':', $line, 2));
         $login = sanitize_user($login);
         $slugs = array_filter(array_map('sanitize_key', array_map('trim', explode(',', $menus))));
+        if ($login && !empty($slugs)) {
+            $result[$login] = $slugs;
+        }
+    }
+    return $result;
+}
+
+function evy_sanitize_restricted_categories_by_user($value) {
+    if (is_array($value)) {
+        $lines = $value;
+    } else {
+        $lines = explode("\n", $value);
+    }
+    $result = [];
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (!$line || strpos($line, ':') === false) {
+            continue;
+        }
+        list($login, $cats) = array_map('trim', explode(':', $line, 2));
+        $login = sanitize_user($login);
+        $slugs = array_filter(array_map('sanitize_title', array_map('trim', explode(',', $cats))));
         if ($login && !empty($slugs)) {
             $result[$login] = $slugs;
         }
@@ -304,6 +333,23 @@ function evy_field_hidden_menus_by_user() {
     if ($slugs) {
         echo '<p class="description">' . esc_html__('Format: user_login:menu_slug1,menu_slug2', 'evy-add-ons-storefront') . '</p>';
         echo '<pre>' . implode("\n", $slugs) . '</pre>';
+    }
+}
+
+function evy_field_restricted_categories_by_user() {
+    $value = get_option('evy_restricted_categories_by_user', []);
+    $lines = [];
+    foreach ($value as $login => $cats) {
+        $lines[] = $login . ':' . implode(',', $cats);
+    }
+    $value = implode("\n", $lines);
+    echo '<textarea name="evy_restricted_categories_by_user" rows="5" cols="40">' . esc_textarea($value) . '</textarea>';
+    $terms = get_terms(['taxonomy' => 'product_cat', 'hide_empty' => false]);
+    if (!is_wp_error($terms)) {
+        $slugs = wp_list_pluck($terms, 'slug');
+        sort($slugs);
+        echo '<p class="description">' . esc_html__('Format: user_login:slug1,slug2', 'evy-add-ons-storefront') . '</p>';
+        echo '<pre>' . esc_html(implode("\n", $slugs)) . '</pre>';
     }
 }
 
