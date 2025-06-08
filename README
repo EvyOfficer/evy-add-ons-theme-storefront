@@ -32,41 +32,9 @@ OM SAB Add-Ons Related Products on Theme Storefront
 ในหน้า Plugins (ปลั๊กอิน) ให้ค้นหา Evy Add-Ons Theme Storefront
 คลิก Activate (เปิดใช้งาน)
 การปรับแต่ง User Roles และ Product Categories
-คุณสามารถปรับแต่งบทบาทผู้ใช้และหมวดหมู่สินค้าที่เกี่ยวข้องกับฟังก์ชันการมองเห็นสินค้าได้ง่ายๆ โดยแก้ไขที่ส่วนบนของไฟล์ evy-add-ons-theme-storefront.php เท่านั้น:
+ตอนนี้คุณสามารถตั้งค่าบทบาทผู้ใช้และหมวดหมู่สินค้าที่ต้องการได้จากหน้า
+**Settings → Evy Add-Ons** ภายในแผงควบคุม WordPress โดยไม่ต้องแก้ไขโค้ดอีกต่อไป:
 
-PHP
-
-// =================================================================================================
-// 🔧 ส่วนที่ 1: การกำหนดค่า User Roles และ Product Categories (ปรับเปลี่ยนได้ที่นี่เท่านั้น)
-// =================================================================================================
-
-/**
- * ฟังก์ชันเช็ก Role ที่เห็นสินค้าทุกหมวดหมู่ (รวม Short term accommodation)
- * เพิ่ม Role ที่นี่ หากต้องการให้ Role อื่นๆ เห็นสินค้าทุกหมวด
- * เช่น ['administrator', 'shop_manager']
- */
-function evy_get_full_access_roles() {
-    return ['shop_manager'];
-}
-
-/**
- * ฟังก์ชันระบุหมวดหมู่สินค้าที่ต้องการจำกัดการเข้าถึง
- * เพิ่ม slug ของหมวดหมู่ที่ต้องการจำกัดสิทธิ์ที่นี่
- * เช่น ['short_term_accommodation', 'special_offers']
- */
-function evy_get_restricted_categories_slugs() {
-    return ['short_term_accommodation'];
-}
-
-/**
- * ฟังก์ชันเช็ก Role ที่ได้รับอนุญาตให้เข้าถึงหมวดหมู่ที่ถูกจำกัด (Restricted Category)
- * เพิ่ม Role ที่นี่ หากต้องการให้ Role อื่นๆ เห็นเฉพาะหมวดที่ถูกจำกัด
- * เช่น ['tenant', 'member']
- */
-function evy_get_restricted_category_access_roles() {
-    return ['tenant'];
-}
-เพียงแค่แก้ไขค่าใน return [...] ของฟังก์ชันเหล่านี้ คุณก็สามารถกำหนดบทบาทและหมวดหมู่ที่ต้องการได้โดยไม่ต้องแก้ไขส่วนอื่นของโค้ด
 
 การสนับสนุน
 หากมีข้อสงสัยหรือปัญหาในการใช้งาน กรุณาติดต่อผู้พัฒนา
@@ -105,41 +73,7 @@ Activate New Plugin:
 On the Plugins page, locate Evy Add-Ons Theme Storefront.
 Click Activate.
 Customizing User Roles and Product Categories
-You can easily customize the user roles and product categories relevant to the product visibility feature by editing only the top section of the evy-add-ons-theme-storefront.php file:
-
-PHP
-
-// =================================================================================================
-// 🔧 Section 1: User Role and Product Category Configuration (Edit this section only)
-// =================================================================================================
-
-/**
- * Function to get roles that have full access to all products (including restricted categories).
- * Add roles here if you want them to see all categories.
- * Example: ['administrator', 'shop_manager']
- */
-function evy_get_full_access_roles() {
-    return ['shop_manager'];
-}
-
-/**
- * Function to specify product category slugs that need restricted access.
- * Add the slugs of categories you want to restrict here.
- * Example: ['short_term_accommodation', 'special_offers']
- */
-function evy_get_restricted_categories_slugs() {
-    return ['short_term_accommodation'];
-}
-
-/**
- * Function to get roles allowed to access the restricted product categories.
- * Add roles here if you want them to see only the restricted categories.
- * Example: ['tenant', 'member']
- */
-function evy_get_restricted_category_access_roles() {
-    return ['tenant'];
-}
-By simply modifying the values within the return [...] arrays of these functions, you can define your desired roles and categories without altering any other part of the code.
+You can now manage which roles have access to products and which categories are restricted from the **Settings → Evy Add-Ons** page inside your WordPress dashboard.
 
 Support
 If you encounter any issues or have questions regarding the plugin's usage, please contact the developer.

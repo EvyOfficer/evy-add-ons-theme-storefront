@@ -30,7 +30,11 @@ define( 'EVY_ADDONS_URL', plugin_dir_url( __FILE__ ) );
  * เช่น ['administrator', 'shop_manager']
  */
 function evy_get_full_access_roles() {
-    return ['shop_manager'];
+    $roles = get_option('evy_full_access_roles', ['shop_manager']);
+    if (!is_array($roles)) {
+        $roles = array_filter(array_map('sanitize_key', explode(',', $roles)));
+    }
+    return $roles;
 }
 
 /**
@@ -39,7 +43,11 @@ function evy_get_full_access_roles() {
  * เช่น ['short_term_accommodation', 'special_offers']
  */
 function evy_get_restricted_categories_slugs() {
-    return ['short_term_accommodation'];
+    $cats = get_option('evy_restricted_categories_slugs', ['short_term_accommodation']);
+    if (!is_array($cats)) {
+        $cats = array_filter(array_map('sanitize_title', explode(',', $cats)));
+    }
+    return $cats;
 }
 
 /**
@@ -48,7 +56,123 @@ function evy_get_restricted_categories_slugs() {
  * เช่น ['tenant', 'member']
  */
 function evy_get_restricted_category_access_roles() {
-    return ['tenant'];
+    $roles = get_option('evy_restricted_category_access_roles', ['tenant']);
+    if (!is_array($roles)) {
+        $roles = array_filter(array_map('sanitize_key', explode(',', $roles)));
+    }
+    return $roles;
+}
+
+// =============================================================================
+// ⚙️ ส่วนเสริม: หน้าการตั้งค่าในแผงควบคุม
+// =============================================================================
+
+add_action('admin_menu', 'evy_add_options_page');
+function evy_add_options_page() {
+    add_options_page(
+        __('Evy Add-Ons Settings', 'evy-add-ons-storefront'),
+        __('Evy Add-Ons', 'evy-add-ons-storefront'),
+        'manage_options',
+        'evy-addons-settings',
+        'evy_render_settings_page'
+    );
+}
+
+add_action('admin_init', 'evy_register_settings');
+function evy_register_settings() {
+    register_setting('evy_addons_settings', 'evy_full_access_roles', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_csv',
+        'default' => ['shop_manager'],
+    ]);
+
+    register_setting('evy_addons_settings', 'evy_restricted_categories_slugs', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_csv',
+        'default' => ['short_term_accommodation'],
+    ]);
+
+    register_setting('evy_addons_settings', 'evy_restricted_category_access_roles', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_csv',
+        'default' => ['tenant'],
+    ]);
+
+    add_settings_section(
+        'evy_settings_section',
+        __('User Roles & Categories', 'evy-add-ons-storefront'),
+        '__return_false',
+        'evy_addons_settings'
+    );
+
+    add_settings_field(
+        'evy_full_access_roles',
+        __('Full Access Roles', 'evy-add-ons-storefront'),
+        'evy_field_full_access_roles',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+
+    add_settings_field(
+        'evy_restricted_categories_slugs',
+        __('Restricted Category Slugs', 'evy-add-ons-storefront'),
+        'evy_field_restricted_categories',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+
+    add_settings_field(
+        'evy_restricted_category_access_roles',
+        __('Roles for Restricted Categories', 'evy-add-ons-storefront'),
+        'evy_field_restricted_roles',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+}
+
+function evy_sanitize_csv($value) {
+    if (!is_array($value)) {
+        $value = explode(',', $value);
+    }
+    $value = array_filter(array_map('sanitize_key', array_map('trim', $value)));
+    return $value;
+}
+
+function evy_field_full_access_roles() {
+    $value = get_option('evy_full_access_roles', ['shop_manager']);
+    if (is_array($value)) {
+        $value = implode(',', $value);
+    }
+    echo '<input type="text" name="evy_full_access_roles" value="' . esc_attr($value) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_restricted_categories() {
+    $value = get_option('evy_restricted_categories_slugs', ['short_term_accommodation']);
+    if (is_array($value)) {
+        $value = implode(',', $value);
+    }
+    echo '<input type="text" name="evy_restricted_categories_slugs" value="' . esc_attr($value) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Comma separated category slugs', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_restricted_roles() {
+    $value = get_option('evy_restricted_category_access_roles', ['tenant']);
+    if (is_array($value)) {
+        $value = implode(',', $value);
+    }
+    echo '<input type="text" name="evy_restricted_category_access_roles" value="' . esc_attr($value) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_render_settings_page() {
+    echo '<div class="wrap">';
+    echo '<h1>' . esc_html__('Evy Add-Ons Settings', 'evy-add-ons-storefront') . '</h1>';
+    echo '<form method="post" action="options.php">';
+    settings_fields('evy_addons_settings');
+    do_settings_sections('evy_addons_settings');
+    submit_button();
+    echo '</form></div>';
 }
 
 // =================================================================================================
