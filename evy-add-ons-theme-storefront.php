@@ -3,7 +3,7 @@
  * Plugin Name: Evy - Add-Ons Theme Storefront
  * Plugin URI:  https://github.com/EvyOfficer
  * Description: Add-Ons for the Storefront theme, product visibility and related products.
- * Version:     1.3.0
+ * Version:     1.4.0
  * Author:      EvyOfficer
  * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
@@ -16,7 +16,7 @@
 defined('ABSPATH') || exit;
 
 // กำหนดค่าคงที่ (Constants) สำหรับปลั๊กอินของคุณ
-define( 'EVY_ADDONS_VERSION', '1.3.0' );
+define( 'EVY_ADDONS_VERSION', '1.4.0' );
 define( 'EVY_ADDONS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EVY_ADDONS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -86,13 +86,37 @@ function evy_get_user_restricted_categories($user_login = null) {
 
     return array_filter(array_map('sanitize_title', array_map('trim', $cats)));
 
- * รายการหมวดหมู่สินค้าที่จำกัดสิทธิ์ตามชื่อผู้ใช้
- * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'cat_slug1', 'cat_slug2' ] ]
+ /**
+ * รายการเมนูที่ต้องซ่อนตามชื่อผู้ใช้
+ * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'menu_slug1', 'menu_slug2' ] ]
+ */
+function evy_get_hidden_menus_by_user() {
+    $data = get_option('evy_hidden_menus_by_user', []);
+    return is_array($data) ? $data : [];
+}
+
+/**
+ * หมวดหมู่สินค้าที่ถูกจำกัดตามชื่อผู้ใช้
+ * รูปแบบค่าที่คืน: [ 'user_login' => [ 'slug1', 'slug2' ] ]
  */
 function evy_get_restricted_categories_by_user() {
     $data = get_option('evy_restricted_categories_by_user', []);
     return is_array($data) ? $data : [];
+}
 
+/**
+ * Return restricted categories for the current user.
+ * If no specific categories are set for the user, fall back to the global list.
+ */
+function evy_get_user_restricted_categories() {
+    $user = wp_get_current_user();
+    $map  = evy_get_restricted_categories_by_user();
+
+    if ($user && isset($map[$user->user_login])) {
+        return $map[$user->user_login];
+    }
+
+    return evy_get_restricted_categories_slugs();
 }
 
 // =============================================================================
@@ -119,15 +143,7 @@ function evy_register_settings() {
     ]);
 
     register_setting('evy_addons_settings', 'evy_restricted_categories_slugs', [
-        'type' => 'array',
-        'sanitize_callback' => 'evy_sanitize_csv',
-        'default' => ['short_term_accommodation'],
-    ]);
-
-    register_setting('evy_addons_settings', 'evy_restricted_category_access_roles', [
-        'type' => 'array',
-        'sanitize_callback' => 'evy_sanitize_csv',
-        'default' => ['tenant'],
+@@ -119,78 +143,76 @@ function evy_register_settings() {
     ]);
 
     register_setting('evy_addons_settings', 'evy_disable_nickname_fields', [
@@ -175,6 +191,13 @@ function evy_register_settings() {
         'evy_settings_section'
     );
 
+    add_settings_field(
+        'evy_restricted_categories_by_user',
+        __('Restricted Categories by User', 'evy-add-ons-storefront'),
+        'evy_field_restricted_categories_by_user',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
 
     add_settings_field(
         'evy_disable_nickname_fields',
@@ -185,28 +208,19 @@ function evy_register_settings() {
         ['label_for' => 'evy_disable_nickname_fields']
     );
 
-
     add_settings_field(
-        'evy_hidden_menus_by_user',
-        __('Hidden Menus by User', 'evy-add-ons-storefront'),
-        'evy_field_hidden_menus_by_user',
+        'evy_hide_menu_for_shop_manager',
+        __('Hide Menus for Shop Manager', 'evy-add-ons-storefront'),
+        'evy_field_hide_menu_shop_manager',
         'evy_addons_settings',
-        'evy_settings_section'
+        'evy_settings_section',
+        ['label_for' => 'evy_hide_menu_for_shop_manager']
     );
 
     add_settings_field(
-        'evy_restricted_categories_by_user',
-        __('Restricted Categories by User', 'evy-add-ons-storefront'),
-        'evy_field_restricted_categories_by_user',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
-}
-
-function evy_sanitize_csv($value) {
-    if (!is_array($value)) {
-        $value = explode(',', $value);
-    }
+        'evy_hide_menu_user_logins',
+        __('Hide Menus for Users', 'evy-add-ons-storefront'),
+@@ -215,50 +237,72 @@ function evy_sanitize_csv($value) {
     $value = array_filter(array_map('sanitize_key', array_map('trim', $value)));
     return $value;
 }
@@ -264,23 +278,22 @@ function evy_field_full_access_roles() {
     echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
 }
 
-
-function evy_field_disable_nickname() {
-    $value = get_option('evy_disable_nickname_fields', true);
-    echo '<input type="checkbox" id="evy_disable_nickname_fields" name="evy_disable_nickname_fields" value="1" ' . checked(1, $value, false) . ' />';
-    echo '<p class="description">' . esc_html__('Remove and lock nickname fields', 'evy-add-ons-storefront') . '</p>';
-}
-
-function evy_field_hide_menu_shop_manager() {
-    $value = get_option('evy_hide_menu_for_shop_manager', true);
-    echo '<input type="checkbox" id="evy_hide_menu_for_shop_manager" name="evy_hide_menu_for_shop_manager" value="1" ' . checked(1, $value, false) . ' />';
-    echo '<p class="description">' . esc_html__('Hide Dashboard and Appearance for shop managers', 'evy-add-ons-storefront') . '</p>';
-}
-
-function evy_field_hide_menu_users() {
-    $value = get_option('evy_hide_menu_user_logins', []);
+function evy_field_restricted_categories() {
+    $value = get_option('evy_restricted_categories_slugs', ['short_term_accommodation']);
     if (is_array($value)) {
         $value = implode(',', $value);
+    }
+    echo '<input type="text" name="evy_restricted_categories_slugs" value="' . esc_attr($value) . '" class="regular-text" />';
+    echo '<p class="description">' . esc_html__('Comma separated category slugs', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_restricted_roles() {
+    $value = get_option('evy_restricted_category_access_roles', ['tenant']);
+    if (is_array($value)) {
+        $value = implode(',', $value);
+    }
+    echo '<input type="text" name="evy_restricted_category_access_roles" value="' . esc_attr($value) . '" class="regular-text" />';
+@@ -284,137 +328,154 @@ function evy_field_hide_menu_users() {
     }
     echo '<input type="text" name="evy_hide_menu_user_logins" value="' . esc_attr($value) . '" class="regular-text" />';
     echo '<p class="description">' . esc_html__('Comma separated user logins', 'evy-add-ons-storefront') . '</p>';
@@ -318,10 +331,9 @@ function evy_field_restricted_categories_by_user() {
     $terms = get_terms(['taxonomy' => 'product_cat', 'hide_empty' => false]);
     if (!is_wp_error($terms)) {
         $slugs = wp_list_pluck($terms, 'slug');
-        if ($slugs) {
-            echo '<p class="description">' . esc_html__('Format: user_login:category_slug1,category_slug2', 'evy-add-ons-storefront') . '</p>';
-            echo '<pre>' . esc_html(implode("\n", $slugs)) . '</pre>';
-        }
+        sort($slugs);
+        echo '<p class="description">' . esc_html__('Format: user_login:slug1,slug2', 'evy-add-ons-storefront') . '</p>';
+        echo '<pre>' . esc_html(implode("\n", $slugs)) . '</pre>';
     }
 }
 
@@ -360,6 +372,33 @@ function evy_user_has_full_access() {
  * ปรับ query สำหรับหน้าเว็บไซต์เพื่อควบคุมการมองเห็นสินค้า
  */
 add_action('woocommerce_product_query', 'evy_filter_product_visibility_frontend');
+function evy_filter_product_visibility_frontend($q) {␊
+    if (is_admin()) return;␊
+
+    // ถ้าผู้ใช้มีสิทธิ์เข้าถึงเต็มรูปแบบ ไม่ต้องกรองอะไรเลย␊
+    if (evy_user_has_full_access()) return;␊
+
+    $tax_query = $q->get('tax_query') ?: [];␊
+    $restricted_categories = evy_get_user_restricted_categories();
+
+    if (evy_user_has_restricted_category_access()) {␊
+        // ผู้ใช้มีสิทธิ์เข้าถึงหมวดหมู่ที่ถูกจำกัด: แสดงเฉพาะสินค้าในหมวดหมู่นั้น
+        $tax_query[] = [
+            'taxonomy' => 'product_cat',
+            'field'    => 'slug',
+            'terms'    => $restricted_categories,
+            'operator' => 'IN',
+        ];
+    } else {
+        // ผู้ใช้ทั่วไป: ซ่อนสินค้าในหมวดหมู่ที่ถูกจำกัด
+        $tax_query[] = [
+            'taxonomy' => 'product_cat',
+            'field'    => 'slug',
+            'terms'    => $restricted_categories,
+            'operator' => 'NOT IN',
+        ];
+    }
+                   
 function evy_filter_product_visibility_frontend($q) {
     if (is_admin()) return;
 
