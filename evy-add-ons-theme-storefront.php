@@ -3,7 +3,7 @@
  * Plugin Name: Evy - Add-Ons Theme Storefront
  * Plugin URI:  https://github.com/EvyOfficer
  * Description: Add-Ons for the Storefront theme, product visibility and related products.
- * Version:     1.4.0
+ * Version:     1.4.1
  * Author:      EvyOfficer
  * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
@@ -16,7 +16,7 @@
 defined('ABSPATH') || exit;
 
 // กำหนดค่าคงที่ (Constants) สำหรับปลั๊กอินของคุณ
-define( 'EVY_ADDONS_VERSION', '1.4.0' );
+define( 'EVY_ADDONS_VERSION', '1.4.1' );
 define( 'EVY_ADDONS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EVY_ADDONS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -63,21 +63,6 @@ function evy_get_restricted_category_access_roles() {
     return $roles;
 }
 
-/**
- * รายชื่อผู้ใช้ที่ควรถูกซ่อนเมนู Dashboard และ Appearance
- */
-function evy_get_hide_menu_user_logins() {
-    $users = get_option('evy_hide_menu_user_logins', []);
-    if (!is_array($users)) {
-        $users = array_filter(array_map('sanitize_user', explode(',', $users)));
-    }
-    return $users;
-}
-
-/**
- * รายการเมนูที่ต้องซ่อนตามชื่อผู้ใช้
- * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'menu_slug1', 'menu_slug2' ] ]
- */
 function evy_get_hidden_menus_by_user() {
     $data = get_option('evy_hidden_menus_by_user', []);
     return is_array($data) ? $data : [];
@@ -148,18 +133,6 @@ function evy_register_settings() {
         'default' => true,
     ]);
 
-    register_setting('evy_addons_settings', 'evy_hide_menu_for_shop_manager', [
-        'type' => 'boolean',
-        'sanitize_callback' => 'rest_sanitize_boolean',
-        'default' => true,
-    ]);
-
-    register_setting('evy_addons_settings', 'evy_hide_menu_user_logins', [
-        'type' => 'array',
-        'sanitize_callback' => 'evy_sanitize_csv',
-        'default' => [],
-    ]);
-
     register_setting('evy_addons_settings', 'evy_hidden_menus_by_user', [
         'type' => 'array',
         'sanitize_callback' => 'evy_sanitize_hidden_menus_by_user',
@@ -204,30 +177,6 @@ function evy_register_settings() {
         ['label_for' => 'evy_disable_nickname_fields']
     );
 
-    add_settings_field(
-        'evy_hide_menu_for_shop_manager',
-        __('Hide Menus for Shop Manager', 'evy-add-ons-storefront'),
-        'evy_field_hide_menu_shop_manager',
-        'evy_addons_settings',
-        'evy_settings_section',
-        ['label_for' => 'evy_hide_menu_for_shop_manager']
-    );
-
-    add_settings_field(
-        'evy_hide_menu_user_logins',
-        __('Hide Menus for Users', 'evy-add-ons-storefront'),
-        'evy_field_hide_menu_users',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
-
-    add_settings_field(
-        'evy_hidden_menus_by_user',
-        __('Hidden Menus by User', 'evy-add-ons-storefront'),
-        'evy_field_hidden_menus_by_user',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
 }
 
 function evy_sanitize_csv($value) {
@@ -315,20 +264,6 @@ function evy_field_disable_nickname() {
     echo '<p class="description">' . esc_html__('Remove and lock nickname fields', 'evy-add-ons-storefront') . '</p>';
 }
 
-function evy_field_hide_menu_shop_manager() {
-    $value = get_option('evy_hide_menu_for_shop_manager', true);
-    echo '<input type="checkbox" id="evy_hide_menu_for_shop_manager" name="evy_hide_menu_for_shop_manager" value="1" ' . checked(1, $value, false) . ' />';
-    echo '<p class="description">' . esc_html__('Hide Dashboard and Appearance for shop managers', 'evy-add-ons-storefront') . '</p>';
-}
-
-function evy_field_hide_menu_users() {
-    $value = get_option('evy_hide_menu_user_logins', []);
-    if (is_array($value)) {
-        $value = implode(',', $value);
-    }
-    echo '<input type="text" name="evy_hide_menu_user_logins" value="' . esc_attr($value) . '" class="regular-text" />';
-    echo '<p class="description">' . esc_html__('Comma separated user logins', 'evy-add-ons-storefront') . '</p>';
-}
 
 function evy_field_hidden_menus_by_user() {
     $value = get_option('evy_hidden_menus_by_user', []);
@@ -531,8 +466,8 @@ if (get_option('evy_disable_nickname_fields', true)) {
     add_action('edit_user_profile_update', 'evy_prevent_nickname_update');
 }
 
-if (get_option('evy_hide_menu_for_shop_manager', true) || !empty(evy_get_hide_menu_user_logins())) {
-    add_action('admin_menu', 'evy_hide_for_shop_manager', 999);
+if (!empty(evy_get_hidden_menus_by_user())) {
+    add_action('admin_menu', 'evy_hide_user_menus', 999);
 }
 
 function evy_truly_remove_nickname_and_display_name_fields($methods) {
@@ -560,20 +495,14 @@ function evy_prevent_nickname_update($user_id) {
     $_POST['display_name'] = $current->display_name;
 }
 
-function evy_hide_for_shop_manager() {
+
+function evy_hide_user_menus() {
     $user = wp_get_current_user();
-    $logins = evy_get_hide_menu_user_logins();
     $custom = evy_get_hidden_menus_by_user();
     $user_menus = $custom[$user->user_login] ?? [];
 
-    if (!current_user_can('shop_manager') && !in_array($user->user_login, $logins, true) && empty($user_menus)) {
+    if (empty($user_menus)) {
         return;
-    }
-
-    if (current_user_can('shop_manager') || in_array($user->user_login, $logins, true)) {
-        remove_menu_page('index.php');
-        remove_menu_page('themes.php');
-        remove_submenu_page('tools.php', 'import.php');
     }
 
     foreach ($user_menus as $slug) {
