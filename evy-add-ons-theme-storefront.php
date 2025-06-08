@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: Evy - Add-Ons Storefront
+ * Plugin Name: Evy - Add-Ons Theme Storefront
  * Plugin URI:  https://github.com/EvyOfficer
  * Description: Add-Ons for the Storefront theme, product visibility and related products.
  * Version:     1.0.0
@@ -8,7 +8,7 @@
  * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain: evy-add-ons-storefront
+ * Text Domain: evy-add-ons-theme-storefront
  * Domain Path: /languages
  */
 
