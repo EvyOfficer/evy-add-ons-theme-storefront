@@ -153,6 +153,15 @@ function evy_register_settings() {
     );
 
     add_settings_field(
+        'evy_disable_nickname_fields',
+        __('Disable Nickname Editing', 'evy-add-ons-storefront'),
+        'evy_field_disable_nickname',
+        'evy_addons_settings',
+        'evy_settings_section',
+        ['label_for' => 'evy_disable_nickname_fields']
+    );
+
+    add_settings_field(
         'evy_full_access_roles',
         __('Full Access Roles', 'evy-add-ons-storefront'),
         'evy_field_full_access_roles',
@@ -166,15 +175,6 @@ function evy_register_settings() {
         'evy_field_restricted_categories_by_user',
         'evy_addons_settings',
         'evy_settings_section'
-    );
-
-    add_settings_field(
-        'evy_disable_nickname_fields',
-        __('Disable Nickname Editing', 'evy-add-ons-storefront'),
-        'evy_field_disable_nickname',
-        'evy_addons_settings',
-        'evy_settings_section',
-        ['label_for' => 'evy_disable_nickname_fields']
     );
 
     add_settings_field(
