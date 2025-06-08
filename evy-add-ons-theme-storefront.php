@@ -38,6 +38,32 @@ function evy_get_full_access_roles() {
 }
 
 /**
+ * ฟังก์ชันระบุหมวดหมู่สินค้าที่ต้องการจำกัดการเข้าถึง
+ * เพิ่ม slug ของหมวดหมู่ที่ต้องการจำกัดสิทธิ์ที่นี่
+ * เช่น ['short_term_accommodation', 'special_offers']
+ */
+function evy_get_restricted_categories_slugs() {
+    $cats = get_option('evy_restricted_categories_slugs', ['short_term_accommodation']);
+    if (!is_array($cats)) {
+        $cats = array_filter(array_map('sanitize_title', explode(',', $cats)));
+    }
+    return $cats;
+}
+
+/**
+ * ฟังก์ชันเช็ก Role ที่ได้รับอนุญาตให้เข้าถึงหมวดหมู่ที่ถูกจำกัด (Restricted Category)
+ * เพิ่ม Role ที่นี่ หากต้องการให้ Role อื่นๆ เห็นเฉพาะหมวดที่ถูกจำกัด
+ * เช่น ['tenant', 'member']
+ */
+function evy_get_restricted_category_access_roles() {
+    $roles = get_option('evy_restricted_category_access_roles', ['tenant']);
+    if (!is_array($roles)) {
+        $roles = array_filter(array_map('sanitize_key', explode(',', $roles)));
+    }
+    return $roles;
+}
+
+/**
  * รายชื่อผู้ใช้ที่ควรถูกซ่อนเมนู Dashboard และ Appearance
  */
 function evy_get_hide_menu_user_logins() {
@@ -49,44 +75,6 @@ function evy_get_hide_menu_user_logins() {
 }
 
 /**
- * รายการเมนูที่ต้องซ่อนตามชื่อผู้ใช้
- * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'menu_slug1', 'menu_slug2' ] ]
- */
-function evy_get_hidden_menus_by_user() {
-    $data = get_option('evy_hidden_menus_by_user', []);
-    return is_array($data) ? $data : [];
-}
-
-/**
- * ดึงหมวดหมู่สินค้าที่อนุญาตให้ผู้ใช้เข้าถึง
- *
- * @param string|null $user_login ชื่อผู้ใช้ (ถ้าไม่ระบุจะใช้ผู้ใช้ปัจจุบัน)
- * @return array  รายการ slug ของหมวดหมู่
- */
-function evy_get_user_restricted_categories($user_login = null) {
-    if ($user_login === null) {
-        if (!is_user_logged_in()) {
-            return [];
-        }
-        $user = wp_get_current_user();
-        $user_login = $user->user_login;
-    } else {
-        $user_login = sanitize_user($user_login);
-    }
-
-    $map = get_option('evy_restricted_categories_by_user', []);
-    if (!is_array($map) || empty($map[$user_login])) {
-        return [];
-    }
-
-    $cats = $map[$user_login];
-    if (!is_array($cats)) {
-        $cats = explode(',', $cats);
-    }
-
-    return array_filter(array_map('sanitize_title', array_map('trim', $cats)));
-
- /**
  * รายการเมนูที่ต้องซ่อนตามชื่อผู้ใช้
  * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'menu_slug1', 'menu_slug2' ] ]
  */
@@ -143,7 +131,15 @@ function evy_register_settings() {
     ]);
 
     register_setting('evy_addons_settings', 'evy_restricted_categories_slugs', [
-@@ -119,78 +143,76 @@ function evy_register_settings() {
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_csv',
+        'default' => ['short_term_accommodation'],
+    ]);
+
+    register_setting('evy_addons_settings', 'evy_restricted_category_access_roles', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_csv',
+        'default' => ['tenant'],
     ]);
 
     register_setting('evy_addons_settings', 'evy_disable_nickname_fields', [
@@ -220,7 +216,24 @@ function evy_register_settings() {
     add_settings_field(
         'evy_hide_menu_user_logins',
         __('Hide Menus for Users', 'evy-add-ons-storefront'),
-@@ -215,50 +237,72 @@ function evy_sanitize_csv($value) {
+        'evy_field_hide_menu_users',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+
+    add_settings_field(
+        'evy_hidden_menus_by_user',
+        __('Hidden Menus by User', 'evy-add-ons-storefront'),
+        'evy_field_hidden_menus_by_user',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+}
+
+function evy_sanitize_csv($value) {
+    if (!is_array($value)) {
+        $value = explode(',', $value);
+    }
     $value = array_filter(array_map('sanitize_key', array_map('trim', $value)));
     return $value;
 }
@@ -293,7 +306,25 @@ function evy_field_restricted_roles() {
         $value = implode(',', $value);
     }
     echo '<input type="text" name="evy_restricted_category_access_roles" value="' . esc_attr($value) . '" class="regular-text" />';
-@@ -284,137 +328,154 @@ function evy_field_hide_menu_users() {
+    echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_disable_nickname() {
+    $value = get_option('evy_disable_nickname_fields', true);
+    echo '<input type="checkbox" id="evy_disable_nickname_fields" name="evy_disable_nickname_fields" value="1" ' . checked(1, $value, false) . ' />';
+    echo '<p class="description">' . esc_html__('Remove and lock nickname fields', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_hide_menu_shop_manager() {
+    $value = get_option('evy_hide_menu_for_shop_manager', true);
+    echo '<input type="checkbox" id="evy_hide_menu_for_shop_manager" name="evy_hide_menu_for_shop_manager" value="1" ' . checked(1, $value, false) . ' />';
+    echo '<p class="description">' . esc_html__('Hide Dashboard and Appearance for shop managers', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_hide_menu_users() {
+    $value = get_option('evy_hide_menu_user_logins', []);
+    if (is_array($value)) {
+        $value = implode(',', $value);
     }
     echo '<input type="text" name="evy_hide_menu_user_logins" value="' . esc_attr($value) . '" class="regular-text" />';
     echo '<p class="description">' . esc_html__('Comma separated user logins', 'evy-add-ons-storefront') . '</p>';
@@ -361,6 +392,15 @@ function evy_user_has_full_access() {
     return count(array_intersect($roles, evy_get_full_access_roles())) > 0;
 }
 
+/**
+ * ตรวจสอบว่าผู้ใช้ปัจจุบันมีบทบาทที่สามารถเข้าถึงหมวดหมู่ที่ถูกจำกัดได้หรือไม่
+ */
+function evy_user_has_restricted_category_access() {
+    if (!is_user_logged_in()) return false;
+    $user = wp_get_current_user();
+    return count(array_intersect($user->roles, evy_get_restricted_category_access_roles())) > 0;
+}
+
 
 // =================================================================================================
 // ⚙️ ส่วนที่ 3: ฟังก์ชันการทำงานหลักของปลั๊กอิน (ไม่ต้องแก้ไข)
@@ -372,16 +412,16 @@ function evy_user_has_full_access() {
  * ปรับ query สำหรับหน้าเว็บไซต์เพื่อควบคุมการมองเห็นสินค้า
  */
 add_action('woocommerce_product_query', 'evy_filter_product_visibility_frontend');
-function evy_filter_product_visibility_frontend($q) {␊
-    if (is_admin()) return;␊
+function evy_filter_product_visibility_frontend($q) {
+    if (is_admin()) return;
 
-    // ถ้าผู้ใช้มีสิทธิ์เข้าถึงเต็มรูปแบบ ไม่ต้องกรองอะไรเลย␊
-    if (evy_user_has_full_access()) return;␊
+    // ถ้าผู้ใช้มีสิทธิ์เข้าถึงเต็มรูปแบบ ไม่ต้องกรองอะไรเลย
+    if (evy_user_has_full_access()) return;
 
-    $tax_query = $q->get('tax_query') ?: [];␊
+    $tax_query = $q->get('tax_query') ?: [];
     $restricted_categories = evy_get_user_restricted_categories();
 
-    if (evy_user_has_restricted_category_access()) {␊
+    if (evy_user_has_restricted_category_access()) {
         // ผู้ใช้มีสิทธิ์เข้าถึงหมวดหมู่ที่ถูกจำกัด: แสดงเฉพาะสินค้าในหมวดหมู่นั้น
         $tax_query[] = [
             'taxonomy' => 'product_cat',
@@ -398,23 +438,6 @@ function evy_filter_product_visibility_frontend($q) {␊
             'operator' => 'NOT IN',
         ];
     }
-                   
-function evy_filter_product_visibility_frontend($q) {
-    if (is_admin()) return;
-
-    // ถ้าผู้ใช้มีสิทธิ์เข้าถึงเต็มรูปแบบ ไม่ต้องกรองอะไรเลย
-    if (evy_user_has_full_access()) return;
-
-    $cats = evy_get_user_restricted_categories();
-    if (empty($cats)) return;
-
-    $tax_query   = $q->get('tax_query') ?: [];
-    $tax_query[] = [
-        'taxonomy' => 'product_cat',
-        'field'    => 'slug',
-        'terms'    => $cats,
-        'operator' => 'IN',
-    ];
 
     $q->set('tax_query', $tax_query);
 }
@@ -428,19 +451,25 @@ function evy_filter_product_visibility_rest($args, $request) {
     // ถ้าผู้ใช้มีสิทธิ์เข้าถึงเต็มรูปแบบ ไม่ต้องกรองอะไรเลย
     if (evy_user_has_full_access()) return $args;
 
-    $cats = evy_get_user_restricted_categories();
-    if (empty($cats)) return $args;
+    $restricted_categories = evy_get_user_restricted_categories();
 
-    if (empty($args['tax_query'])) {
-        $args['tax_query'] = [];
+    if (evy_user_has_restricted_category_access()) {
+        // ผู้ใช้มีสิทธิ์เข้าถึงหมวดหมู่ที่ถูกจำกัด: แสดงเฉพาะสินค้าในหมวดหมู่นั้น
+        $args['tax_query'][] = [
+            'taxonomy' => 'product_cat',
+            'field'    => 'slug',
+            'terms'    => $restricted_categories,
+            'operator' => 'IN',
+        ];
+    } else {
+        // ผู้ใช้ทั่วไป: ซ่อนสินค้าในหมวดหมู่ที่ถูกจำกัด
+        $args['tax_query'][] = [
+            'taxonomy' => 'product_cat',
+            'field'    => 'slug',
+            'terms'    => $restricted_categories,
+            'operator' => 'NOT IN',
+        ];
     }
-
-    $args['tax_query'][] = [
-        'taxonomy' => 'product_cat',
-        'field'    => 'slug',
-        'terms'    => $cats,
-        'operator' => 'IN',
-    ];
 
     return $args;
 }
