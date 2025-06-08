@@ -3,7 +3,7 @@
  * Plugin Name: Evy - Add-Ons Theme Storefront
  * Plugin URI:  https://github.com/EvyOfficer
  * Description: Add-Ons for the Storefront theme, product visibility and related products.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      EvyOfficer
  * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
@@ -16,7 +16,7 @@
 defined('ABSPATH') || exit;
 
 // กำหนดค่าคงที่ (Constants) สำหรับปลั๊กอินของคุณ
-define( 'EVY_ADDONS_VERSION', '1.0.0' );
+define( 'EVY_ADDONS_VERSION', '1.1.0' );
 define( 'EVY_ADDONS_DIR', plugin_dir_path( __FILE__ ) );
 define( 'EVY_ADDONS_URL', plugin_dir_url( __FILE__ ) );
 
@@ -98,6 +98,18 @@ function evy_register_settings() {
         'default' => ['tenant'],
     ]);
 
+    register_setting('evy_addons_settings', 'evy_disable_nickname_fields', [
+        'type' => 'boolean',
+        'sanitize_callback' => 'rest_sanitize_boolean',
+        'default' => true,
+    ]);
+
+    register_setting('evy_addons_settings', 'evy_hide_menu_for_shop_manager', [
+        'type' => 'boolean',
+        'sanitize_callback' => 'rest_sanitize_boolean',
+        'default' => true,
+    ]);
+
     add_settings_section(
         'evy_settings_section',
         __('User Roles & Categories', 'evy-add-ons-storefront'),
@@ -127,6 +139,24 @@ function evy_register_settings() {
         'evy_field_restricted_roles',
         'evy_addons_settings',
         'evy_settings_section'
+    );
+
+    add_settings_field(
+        'evy_disable_nickname_fields',
+        __('Disable Nickname Editing', 'evy-add-ons-storefront'),
+        'evy_field_disable_nickname',
+        'evy_addons_settings',
+        'evy_settings_section',
+        ['label_for' => 'evy_disable_nickname_fields']
+    );
+
+    add_settings_field(
+        'evy_hide_menu_for_shop_manager',
+        __('Hide Menus for Shop Manager', 'evy-add-ons-storefront'),
+        'evy_field_hide_menu_shop_manager',
+        'evy_addons_settings',
+        'evy_settings_section',
+        ['label_for' => 'evy_hide_menu_for_shop_manager']
     );
 }
 
@@ -163,6 +193,18 @@ function evy_field_restricted_roles() {
     }
     echo '<input type="text" name="evy_restricted_category_access_roles" value="' . esc_attr($value) . '" class="regular-text" />';
     echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_disable_nickname() {
+    $value = get_option('evy_disable_nickname_fields', true);
+    echo '<input type="checkbox" id="evy_disable_nickname_fields" name="evy_disable_nickname_fields" value="1" ' . checked(1, $value, false) . ' />';
+    echo '<p class="description">' . esc_html__('Remove and lock nickname fields', 'evy-add-ons-storefront') . '</p>';
+}
+
+function evy_field_hide_menu_shop_manager() {
+    $value = get_option('evy_hide_menu_for_shop_manager', true);
+    echo '<input type="checkbox" id="evy_hide_menu_for_shop_manager" name="evy_hide_menu_for_shop_manager" value="1" ' . checked(1, $value, false) . ' />';
+    echo '<p class="description">' . esc_html__('Hide Dashboard and Appearance for shop managers', 'evy-add-ons-storefront') . '</p>';
 }
 
 function evy_render_settings_page() {
@@ -317,3 +359,54 @@ function evy_filter_related_products_by_same_category($related_posts, $product_i
 }
 
 // --- End: Related Products Functions ---
+
+// --- Start: Admin UX Tweaks ---
+
+if (get_option('evy_disable_nickname_fields', true)) {
+    add_filter('user_contactmethods', 'evy_truly_remove_nickname_and_display_name_fields', 100);
+    add_action('admin_head-profile.php', 'evy_remove_nickname_with_buffer_start');
+    add_action('admin_head-user-edit.php', 'evy_remove_nickname_with_buffer_start');
+    add_action('personal_options_update', 'evy_prevent_nickname_update');
+    add_action('edit_user_profile_update', 'evy_prevent_nickname_update');
+}
+
+if (get_option('evy_hide_menu_for_shop_manager', true)) {
+    add_action('admin_menu', 'evy_hide_for_shop_manager', 999);
+}
+
+function evy_truly_remove_nickname_and_display_name_fields($methods) {
+    remove_action('show_user_profile', 'default_profile_fields');
+    remove_action('edit_user_profile', 'default_profile_fields');
+    return $methods;
+}
+
+function evy_remove_nickname_with_buffer_start() {
+    ob_start('evy_remove_nickname_callback');
+}
+
+function evy_remove_nickname_callback($buffer) {
+    $buffer = preg_replace('/<tr class="user-nickname-wrap.*?<\/tr>/s', '', $buffer);
+    $buffer = preg_replace('/<tr class="user-display-name-wrap.*?<\/tr>/s', '', $buffer);
+    return $buffer;
+}
+
+function evy_prevent_nickname_update($user_id) {
+    if (!current_user_can('edit_user', $user_id)) {
+        return;
+    }
+    $current = get_userdata($user_id);
+    $_POST['nickname'] = $current->nickname;
+    $_POST['display_name'] = $current->display_name;
+}
+
+function evy_hide_for_shop_manager() {
+    if (!current_user_can('shop_manager')) {
+        return;
+    }
+
+    remove_menu_page('index.php');
+    remove_menu_page('themes.php');
+    remove_submenu_page('tools.php', 'import.php');
+}
+
+// --- End: Admin UX Tweaks ---
