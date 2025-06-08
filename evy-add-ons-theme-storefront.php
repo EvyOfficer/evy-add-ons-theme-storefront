@@ -92,6 +92,21 @@ function evy_get_restricted_categories_by_user() {
     return is_array($data) ? $data : [];
 }
 
+/**
+ * Return restricted categories for the current user.
+ * If no specific categories are set for the user, fall back to the global list.
+ */
+function evy_get_user_restricted_categories() {
+    $user = wp_get_current_user();
+    $map  = evy_get_restricted_categories_by_user();
+
+    if ($user && isset($map[$user->user_login])) {
+        return $map[$user->user_login];
+    }
+
+    return evy_get_restricted_categories_slugs();
+}
+
 // =============================================================================
 // ⚙️ ส่วนเสริม: หน้าการตั้งค่าในแผงควบคุม
 // =============================================================================
@@ -404,7 +419,7 @@ function evy_filter_product_visibility_frontend($q) {
     if (evy_user_has_full_access()) return;
 
     $tax_query = $q->get('tax_query') ?: [];
-    $restricted_categories = evy_get_restricted_categories_slugs(); // ดึงค่าจากฟังก์ชันด้านบน
+    $restricted_categories = evy_get_user_restricted_categories();
 
     if (evy_user_has_restricted_category_access()) {
         // ผู้ใช้มีสิทธิ์เข้าถึงหมวดหมู่ที่ถูกจำกัด: แสดงเฉพาะสินค้าในหมวดหมู่นั้น
@@ -436,7 +451,7 @@ function evy_filter_product_visibility_rest($args, $request) {
     // ถ้าผู้ใช้มีสิทธิ์เข้าถึงเต็มรูปแบบ ไม่ต้องกรองอะไรเลย
     if (evy_user_has_full_access()) return $args;
 
-    $restricted_categories = evy_get_restricted_categories_slugs(); // ดึงค่าจากฟังก์ชันด้านบน
+    $restricted_categories = evy_get_user_restricted_categories();
 
     if (evy_user_has_restricted_category_access()) {
         // ผู้ใช้มีสิทธิ์เข้าถึงหมวดหมู่ที่ถูกจำกัด: แสดงเฉพาะสินค้าในหมวดหมู่นั้น
