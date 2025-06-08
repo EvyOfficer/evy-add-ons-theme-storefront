@@ -177,6 +177,14 @@ function evy_register_settings() {
         ['label_for' => 'evy_disable_nickname_fields']
     );
 
+    add_settings_field(
+        'evy_hidden_menus_by_user',
+        __('Hidden Menus by User', 'evy-add-ons-storefront'),
+        'evy_field_hidden_menus_by_user',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+
 }
 
 function evy_sanitize_csv($value) {
