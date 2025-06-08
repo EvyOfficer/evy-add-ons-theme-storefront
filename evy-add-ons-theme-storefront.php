@@ -1,14 +1,14 @@
 <?php
 /**
- * Plugin Name: Evy Add-Ons Theme Storefront
- * Plugin URI:  https://example.com/evy-add-ons-theme-storefront
- * Description: A combined add-on plugin for the Storefront theme, integrating custom functionalities for product visibility and related products.
+ * Plugin Name: Evy - Add-Ons Storefront
+ * Plugin URI:  https://github.com/EvyOfficer
+ * Description: Add-Ons for the Storefront theme, product visibility and related products.
  * Version:     1.0.0
- * Author:      Your Name
- * Author URI:  https://example.com
+ * Author:      EvyOfficer
+ * Author URI:  https://github.com/EvyOfficer
  * License:     GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain: evy-add-ons-theme-storefront
+ * Text Domain: evy-add-ons-storefront
  * Domain Path: /languages
  */
 
