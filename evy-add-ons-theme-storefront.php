@@ -83,6 +83,15 @@ function evy_get_hidden_menus_by_user() {
     return is_array($data) ? $data : [];
 }
 
+/**
+ * รายการหมวดหมู่สินค้าที่จำกัดสิทธิ์ตามชื่อผู้ใช้
+ * ค่าที่คืนเป็นรูปแบบ [ 'user_login' => [ 'cat_slug1', 'cat_slug2' ] ]
+ */
+function evy_get_restricted_categories_by_user() {
+    $data = get_option('evy_restricted_categories_by_user', []);
+    return is_array($data) ? $data : [];
+}
+
 // =============================================================================
 // ⚙️ ส่วนเสริม: หน้าการตั้งค่าในแผงควบคุม
 // =============================================================================
@@ -142,6 +151,12 @@ function evy_register_settings() {
         'default' => [],
     ]);
 
+    register_setting('evy_addons_settings', 'evy_restricted_categories_by_user', [
+        'type' => 'array',
+        'sanitize_callback' => 'evy_sanitize_restricted_categories_by_user',
+        'default' => [],
+    ]);
+
     add_settings_section(
         'evy_settings_section',
         __('User Roles & Categories', 'evy-add-ons-storefront'),
@@ -157,21 +172,6 @@ function evy_register_settings() {
         'evy_settings_section'
     );
 
-    add_settings_field(
-        'evy_restricted_categories_slugs',
-        __('Restricted Category Slugs', 'evy-add-ons-storefront'),
-        'evy_field_restricted_categories',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
-
-    add_settings_field(
-        'evy_restricted_category_access_roles',
-        __('Roles for Restricted Categories', 'evy-add-ons-storefront'),
-        'evy_field_restricted_roles',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
 
     add_settings_field(
         'evy_disable_nickname_fields',
@@ -182,27 +182,19 @@ function evy_register_settings() {
         ['label_for' => 'evy_disable_nickname_fields']
     );
 
-    add_settings_field(
-        'evy_hide_menu_for_shop_manager',
-        __('Hide Menus for Shop Manager', 'evy-add-ons-storefront'),
-        'evy_field_hide_menu_shop_manager',
-        'evy_addons_settings',
-        'evy_settings_section',
-        ['label_for' => 'evy_hide_menu_for_shop_manager']
-    );
-
-    add_settings_field(
-        'evy_hide_menu_user_logins',
-        __('Hide Menus for Users', 'evy-add-ons-storefront'),
-        'evy_field_hide_menu_users',
-        'evy_addons_settings',
-        'evy_settings_section'
-    );
 
     add_settings_field(
         'evy_hidden_menus_by_user',
         __('Hidden Menus by User', 'evy-add-ons-storefront'),
         'evy_field_hidden_menus_by_user',
+        'evy_addons_settings',
+        'evy_settings_section'
+    );
+
+    add_settings_field(
+        'evy_restricted_categories_by_user',
+        __('Restricted Categories by User', 'evy-add-ons-storefront'),
+        'evy_field_restricted_categories_by_user',
         'evy_addons_settings',
         'evy_settings_section'
     );
@@ -238,6 +230,28 @@ function evy_sanitize_hidden_menus_by_user($value) {
     return $result;
 }
 
+function evy_sanitize_restricted_categories_by_user($value) {
+    if (is_array($value)) {
+        $lines = $value;
+    } else {
+        $lines = explode("\n", $value);
+    }
+    $result = [];
+    foreach ($lines as $line) {
+        $line = trim($line);
+        if (!$line || strpos($line, ':') === false) {
+            continue;
+        }
+        list($login, $cats) = array_map('trim', explode(':', $line, 2));
+        $login = sanitize_user($login);
+        $slugs = array_filter(array_map('sanitize_title', array_map('trim', explode(',', $cats))));
+        if ($login && !empty($slugs)) {
+            $result[$login] = $slugs;
+        }
+    }
+    return $result;
+}
+
 function evy_field_full_access_roles() {
     $value = get_option('evy_full_access_roles', ['shop_manager']);
     if (is_array($value)) {
@@ -247,23 +261,6 @@ function evy_field_full_access_roles() {
     echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
 }
 
-function evy_field_restricted_categories() {
-    $value = get_option('evy_restricted_categories_slugs', ['short_term_accommodation']);
-    if (is_array($value)) {
-        $value = implode(',', $value);
-    }
-    echo '<input type="text" name="evy_restricted_categories_slugs" value="' . esc_attr($value) . '" class="regular-text" />';
-    echo '<p class="description">' . esc_html__('Comma separated category slugs', 'evy-add-ons-storefront') . '</p>';
-}
-
-function evy_field_restricted_roles() {
-    $value = get_option('evy_restricted_category_access_roles', ['tenant']);
-    if (is_array($value)) {
-        $value = implode(',', $value);
-    }
-    echo '<input type="text" name="evy_restricted_category_access_roles" value="' . esc_attr($value) . '" class="regular-text" />';
-    echo '<p class="description">' . esc_html__('Comma separated role slugs', 'evy-add-ons-storefront') . '</p>';
-}
 
 function evy_field_disable_nickname() {
     $value = get_option('evy_disable_nickname_fields', true);
@@ -304,6 +301,24 @@ function evy_field_hidden_menus_by_user() {
     if ($slugs) {
         echo '<p class="description">' . esc_html__('Format: user_login:menu_slug1,menu_slug2', 'evy-add-ons-storefront') . '</p>';
         echo '<pre>' . implode("\n", $slugs) . '</pre>';
+    }
+}
+
+function evy_field_restricted_categories_by_user() {
+    $value = get_option('evy_restricted_categories_by_user', []);
+    $lines = [];
+    foreach ($value as $login => $cats) {
+        $lines[] = $login . ':' . implode(',', $cats);
+    }
+    $value = implode("\n", $lines);
+    echo '<textarea name="evy_restricted_categories_by_user" rows="5" cols="40">' . esc_textarea($value) . '</textarea>';
+    $terms = get_terms(['taxonomy' => 'product_cat', 'hide_empty' => false]);
+    if (!is_wp_error($terms)) {
+        $slugs = wp_list_pluck($terms, 'slug');
+        if ($slugs) {
+            echo '<p class="description">' . esc_html__('Format: user_login:category_slug1,category_slug2', 'evy-add-ons-storefront') . '</p>';
+            echo '<pre>' . esc_html(implode("\n", $slugs)) . '</pre>';
+        }
     }
 }
 
